@@ -13,9 +13,21 @@ i makro rysujące (`draw_plots.C`) będą dodane później.
 
 - kompilator z obsługą **C++17** (g++)
 - **ROOT 6** (testowano na 6.40), z dostępnym `root-config`
-- **Pythia 8** w wersji ≥ 8.309 (testowano na 8.312), z dostępnym `pythia8-config`.
-  Wersja 8.309 jest wymagana ze względu na `PythiaParallel`, używane w `generate.cc`.
+- **Pythia 8** (testowano na 8.312), z dostępnym `pythia8-config`.
+  Wersja ≥ 8.309 jest potrzebna tylko do `generate.cc`, bo dopiero od niej istnieje `PythiaParallel`.
+  `generate_single_thread.cc` korzysta wyłącznie ze standardowego API Pythii 8 i działa także na starszych wersjach.
 - `make`
+
+> [!IMPORTANT]
+> **Pythia starsza niż 8.309:** `generate.cc` się nie skompiluje, więc samo `make` (budujące oba
+> programy) zakończy się błędem. Użyj wtedy wersji jednowątkowej:
+>
+> ```bash
+> make run_single        # kompiluje i uruchamia tylko generate_single_thread
+> ```
+>
+> Fizycznie daje ona ten sam wynik w tym samym pliku `events.root`, tylko wolniej.
+> Wersję Pythii sprawdzisz poleceniem `pythia8-config --version`.
 
 `pythia8-config` i `root-config` muszą być w `PATH`, np. po aktywacji środowiska conda z ROOT i Pythią
 (`conda activate hep-env`).
@@ -74,9 +86,9 @@ TFile f("events.root"); f.Get("production_info")->Print();
 ## Kompilacja i uruchamianie
 
 ```bash
-make                  # kompiluje oba generatory
-make run              # generator wielowątkowy  -> events.root (100 000 zdarzeń)
-make run_single       # generator jednowątkowy  -> events.root (100 000 zdarzeń)
+make                  # kompiluje oba generatory (wymaga Pythii >= 8.309)
+make run              # generator wielowątkowy  -> events.root (100 000 zdarzeń, Pythia >= 8.309)
+make run_single       # generator jednowątkowy  -> events.root (100 000 zdarzeń, dowolna Pythia 8)
 make clean            # usuwa skompilowane programy
 ```
 
