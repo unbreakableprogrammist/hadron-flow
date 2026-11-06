@@ -105,7 +105,6 @@ przez kilka minut obciąża tylko jeden rdzeń, a pozostałe stoją bezczynnie.
 ### Jak to działa
 
 - Liczba wątków jest pobierana z systemu przez `std::thread::hardware_concurrency()`.
-  Na Linuksie ta funkcja korzysta z `sysconf(_SC_NPROCESSORS_ONLN)` / `sched_getaffinity`.
 - `PythiaParallel` tworzy **osobną instancję Pythii dla każdego wątku**, z seedem
   `12345 + k` dla wątku `k`.
 - Przy `Parallelism:balanceLoad = on` każdy wątek generuje **stałą liczbę zdarzeń** (N / liczba wątków).
