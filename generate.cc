@@ -33,10 +33,9 @@ int main(int argc, char* argv[]) {
     const int  seed    = 12345;  // Staly seed -> kazdy watek dostaje seed, seed+1, ...
 
     // Liczba dostepnych watkow sprzetowych. Na Linuksie std::thread::hardware_concurrency()
-    // korzysta pod spodem z sysconf(_SC_NPROCESSORS_ONLN) / sched_getaffinity.
     unsigned int nThreads = std::thread::hardware_concurrency();
     if (nThreads == 0) nThreads = 1;  // Gdy system nie potrafi tego okreslic
-    // Opcjonalne nadpisanie (odtworzenie produkcji wykonanej na innej liczbie watkow)
+    // Opcjonalne nadpisanie i zrobienie innej liczby watkow (np. w celu odtworzenia produkcji na innej maszynie)
     if (argc > 2) nThreads = static_cast<unsigned int>(std::max(1, std::stoi(argv[2])));
 
     // ROOT bedzie wolany z roznych watkow (choc nigdy jednoczesnie)
