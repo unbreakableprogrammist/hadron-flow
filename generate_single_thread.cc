@@ -2,11 +2,12 @@
 // W pelni deterministyczna: przy tym samym seedzie daje identyczny plik bit-w-bit.
 //
 // Uzycie:  ./generate_single_thread [liczba_zdarzen]   (domyslnie 100 000)
-// Wynik:   events_single.root (TTree "events")
+// Wynik:   events.root (TTree "events")
 
 #include "Pythia8/Pythia.h"
 #include "TFile.h"
 #include "TTree.h"
+#include "TNamed.h"
 #include <vector>
 #include <iostream>
 #include <string>
@@ -49,7 +50,7 @@ int main(int argc, char* argv[]) {
     const auto tInit = Clock::now();
 
     // 3. Utworzenie binarnego pliku ROOT i drzewa kolumnowego TTree
-    TFile* outFile = new TFile("events_single.root", "RECREATE");
+    TFile* outFile = new TFile("events.root", "RECREATE");
     TTree* tree = new TTree("events", "pp collisions at 13.6 TeV");
 
     // Bufory na parametry czastek w jednym zdarzeniu
@@ -111,6 +112,12 @@ int main(int argc, char* argv[]) {
     pythia.stat();      // Podsumowanie przekrojow czynnych
     outFile->cd();
     tree->Write("", TObject::kOverwrite);  // Zrzut buforow TTree na dysk
+    // Parametry produkcji zapisane w pliku -> mozna ja odtworzyc
+    TNamed("production_info",
+           "generator=generate_single_thread; seed=" + std::to_string(seed) +
+           "; threads=1; events=" + std::to_string(nEvents) +
+           "; reproduce: ./generate_single_thread " + std::to_string(nEvents))
+        .Write();
     outFile->Close();   // Zamkniecie pliku
     delete outFile;
     const auto tEnd = Clock::now();
@@ -132,6 +139,6 @@ int main(int argc, char* argv[]) {
     if (nFilled < nEvents) {
         std::cout << "Uwaga: " << (nEvents - nFilled) << " zdarzen nie wygenerowalo sie poprawnie." << std::endl;
     }
-    std::cout << "Gotowe! Dane zapisano w events_single.root" << std::endl;
+    std::cout << "Gotowe! Dane zapisano w events.root" << std::endl;
     return 0;
 }

@@ -32,7 +32,7 @@ analyze: analyze.cc
 run: generate
 	./generate $(N)
 
-# Uruchomienie generatora jednowątkowego -> events_single.root
+# Uruchomienie generatora jednowątkowego -> events.root
 run_single: generate_single_thread
 	./generate_single_thread $(N)
 

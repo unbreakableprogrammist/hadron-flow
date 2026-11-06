@@ -1,16 +1,19 @@
-// Generator zderzen pp @ sqrt(s) = 13.6 TeV (Pythia 8) - wersja WIELOWATKOWA.
+// Generator zderzen pp @ sqrt(s) = 13.6 TeV (Pythia 8) - wersja wielowatkowa.
 // Uzywa wszystkich dostepnych watkow procesora (PythiaParallel).
-// Uwaga: wynik jest statystycznie rownowazny, ale nie identyczny bit-w-bit
-// miedzy uruchomieniami (podzial zdarzen miedzy watki zalezy od planisty OS).
-// Dla pelnej powtarzalnosci uzyj generate_single_thread.
-//
-// Uzycie:  ./generate [liczba_zdarzen]   (domyslnie 100 000)
+// Reprodukowalnosc: przy tej samej liczbie watkow generowany jest dokladnie ten sam
+// zbior zdarzen (watek k ma seed 12345+k i zawsze generuje N/liczba_watkow zdarzen),
+// zmienia sie jedynie kolejnosc wierszy w TTree -> histogramy sa identyczne.
+// Liczba watkow jest zapisywana w events.root; aby odtworzyc produkcje na innej
+// maszynie, podaj ja jako drugi argument.
+// Uzycie:  ./generate [liczba_zdarzen] [liczba_watkow]
+//          (domyslnie 100 000 zdarzen, wszystkie dostepne watki)
 // Wynik:   events.root (TTree "events")
 
 #include "Pythia8/Pythia.h"
 #include "Pythia8/PythiaParallel.h"
 #include "TFile.h"
 #include "TTree.h"
+#include "TNamed.h"
 #include "TROOT.h"
 #include <vector>
 #include <iostream>
@@ -22,7 +25,8 @@
 #include <iomanip>
 
 int main(int argc, char* argv[]) {
-    using Clock = std::chrono::steady_clock;
+    // liczenie czasu wykonania programu (benchmark)
+    using Clock = std::chrono::steady_clock; 
     const auto tStart = Clock::now();
 
     const long nEvents = (argc > 1) ? std::stol(argv[1]) : 100000;
@@ -32,6 +36,8 @@ int main(int argc, char* argv[]) {
     // korzysta pod spodem z sysconf(_SC_NPROCESSORS_ONLN) / sched_getaffinity.
     unsigned int nThreads = std::thread::hardware_concurrency();
     if (nThreads == 0) nThreads = 1;  // Gdy system nie potrafi tego okreslic
+    // Opcjonalne nadpisanie (odtworzenie produkcji wykonanej na innej liczbie watkow)
+    if (argc > 2) nThreads = static_cast<unsigned int>(std::max(1, std::stoi(argv[2])));
 
     // ROOT bedzie wolany z roznych watkow (choc nigdy jednoczesnie)
     ROOT::EnableThreadSafety();
@@ -52,6 +58,11 @@ int main(int argc, char* argv[]) {
 
     // Liczba watkow = wszystkie dostepne
     pythia.readString("Parallelism:numThreads = " + std::to_string(nThreads));
+
+    // Reprodukowalnosc: kazdy watek generuje stala liczbe zdarzen (N / liczba_watkow)
+    // ze swoim seedem, niezaleznie od planisty OS (to jest wartosc domyslna,
+    // ustawiamy ja jawnie, bo od niej zalezy powtarzalnosc produkcji).
+    pythia.readString("Parallelism:balanceLoad = on");
 
     // Wyciszenie komunikatow diagnostycznych pojedynczych zdarzen
     pythia.readString("Next:numberCount = 0");
@@ -133,6 +144,13 @@ int main(int argc, char* argv[]) {
     pythia.stat();      // Podsumowanie przekrojow czynnych
     outFile->cd();
     tree->Write("", TObject::kOverwrite);  // Zrzut buforow TTree na dysk
+    // Parametry produkcji zapisane w pliku -> mozna ja odtworzyc
+    TNamed("production_info",
+           "generator=generate (PythiaParallel); seed=" + std::to_string(seed) +
+           "; threads=" + std::to_string(nThreads) +
+           "; events=" + std::to_string(nEvents) +
+           "; reproduce: ./generate " + std::to_string(nEvents) + " " + std::to_string(nThreads))
+        .Write();
     outFile->Close();   // Zamkniecie pliku
     delete outFile;
     const auto tEnd = Clock::now();
