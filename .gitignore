@@ -1,0 +1,11 @@
+# Pliki binarne i dane ROOT
+*.root
+
+# Skompilowane programy wykonywalne
+generate
+analyze
+
+# Pliki obiektowe i tymczasowe
+*.o
+*.so
+.vscode/
