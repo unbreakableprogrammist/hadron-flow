@@ -3,9 +3,13 @@
 
 # Skompilowane programy wykonywalne
 generate
+generate_single_thread
+benchmark_*.log
 analyze
 
 # Pliki obiektowe i tymczasowe
 *.o
 *.so
 .vscode/
+# Plik wynikowy analizy musi trafic do repozytorium
+!analysis.root

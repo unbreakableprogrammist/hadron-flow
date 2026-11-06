@@ -1,12 +1,44 @@
+// Generator zderzen pp @ sqrt(s) = 13.6 TeV (Pythia 8) - wersja WIELOWATKOWA.
+// Uzywa wszystkich dostepnych watkow procesora (PythiaParallel).
+// Uwaga: wynik jest statystycznie rownowazny, ale nie identyczny bit-w-bit
+// miedzy uruchomieniami (podzial zdarzen miedzy watki zalezy od planisty OS).
+// Dla pelnej powtarzalnosci uzyj generate_single_thread.
+//
+// Uzycie:  ./generate [liczba_zdarzen]   (domyslnie 100 000)
+// Wynik:   events.root (TTree "events")
+
 #include "Pythia8/Pythia.h"
+#include "Pythia8/PythiaParallel.h"
 #include "TFile.h"
 #include "TTree.h"
+#include "TROOT.h"
 #include <vector>
 #include <iostream>
+#include <string>
+#include <cmath>
+#include <chrono>
+#include <thread>
+#include <algorithm>
+#include <iomanip>
 
-int main() {
-    // 1. Inicjalizacja obiektu generatora Pythia 8
-    Pythia8::Pythia pythia;
+int main(int argc, char* argv[]) {
+    using Clock = std::chrono::steady_clock;
+    const auto tStart = Clock::now();
+
+    const long nEvents = (argc > 1) ? std::stol(argv[1]) : 100000;
+    const int  seed    = 12345;  // Staly seed -> kazdy watek dostaje seed, seed+1, ...
+
+    // Liczba dostepnych watkow sprzetowych. Na Linuksie std::thread::hardware_concurrency()
+    // korzysta pod spodem z sysconf(_SC_NPROCESSORS_ONLN) / sched_getaffinity.
+    unsigned int nThreads = std::thread::hardware_concurrency();
+    if (nThreads == 0) nThreads = 1;  // Gdy system nie potrafi tego okreslic
+
+    // ROOT bedzie wolany z roznych watkow (choc nigdy jednoczesnie)
+    ROOT::EnableThreadSafety();
+
+    // 1. Inicjalizacja rownoleglego generatora Pythia 8
+    //    (kazdy watek ma wlasna, niezalezna instancje Pythii)
+    Pythia8::PythiaParallel pythia;
 
     // 2. Konfiguracja fizyki zderzenia
     pythia.readString("Beams:idA = 2212");       // Wiazka A: proton (PDG 2212)
@@ -14,7 +46,15 @@ int main() {
     pythia.readString("Beams:eCM = 13600.");     // sqrt(s) = 13.6 TeV (13600 GeV)
     pythia.readString("SoftQCD:all = on");       // Procesy Minimum Bias (miekka chromodynamika)
 
+    // Reprodukowalnosc: jawnie ustawiony seed generatora liczb losowych
+    pythia.readString("Random:setSeed = on");
+    pythia.readString("Random:seed = " + std::to_string(seed));
+
+    // Liczba watkow = wszystkie dostepne
+    pythia.readString("Parallelism:numThreads = " + std::to_string(nThreads));
+
     // Wyciszenie komunikatow diagnostycznych pojedynczych zdarzen
+    pythia.readString("Next:numberCount = 0");
     pythia.readString("Next:numberShowInfo = 0");
     pythia.readString("Next:numberShowProcess = 0");
     pythia.readString("Next:numberShowEvent = 0");
@@ -24,6 +64,7 @@ int main() {
         std::cerr << "Blad: Inicjalizacja Pythii nie powiodla sie!" << std::endl;
         return 1;
     }
+    const auto tInit = Clock::now();
 
     // 3. Utworzenie binarnego pliku ROOT i drzewa kolumnowego TTree
     TFile* outFile = new TFile("events.root", "RECREATE");
@@ -34,7 +75,7 @@ int main() {
     std::vector<int>    p_charge;  // Ladunek elektryczny (-1, 0, +1)
     std::vector<double> p_pt;      // Ped poprzeczny pT [GeV]
     std::vector<double> p_eta;     // Pseudorapidity eta
-    std::vector<double> p_phi;     // Kat azymutalny phi [rad]
+    std::vector<double> p_phi;     // Kat azymutalny phi [rad], zakres (-pi, pi]
 
     // Podpiecie buforow pod galezie (kolumny) drzewa TTree
     tree->Branch("id",     &p_id);
@@ -43,13 +84,19 @@ int main() {
     tree->Branch("eta",    &p_eta);
     tree->Branch("phi",    &p_phi);
 
-    // 4. Glowna petla generowania zderzen
-    const int nEvents = 100000; // Testowo 1 000, docelowo 100 000
-    std::cout << "Rozpoczynam generowanie " << nEvents << " zderzen..." << std::endl;
+    // 4. Glowna petla generowania zderzen (rownolegle)
+    std::cout << "Rozpoczynam generowanie " << nEvents << " zderzen ("
+              << nThreads << " watkow)..." << std::endl;
 
-    for (int iEvent = 0; iEvent < nEvents; ++iEvent) {
-        // Losowanie i symulacja kolejnego zderzenia
-        if (!pythia.next()) continue;
+    long nFilled = 0;
+    const long printEvery = std::max(1L, nEvents / 10);
+
+    // Zdarzenia generowane sa rownolegle, ale callback jest domyslnie
+    // synchronizowany (Parallelism:processAsync = off), wiec w danej chwili
+    // tylko jeden watek wypelnia bufory i TTree -> brak wyscigow.
+    // Nieudane zdarzenia nie sa przekazywane do callbacku.
+    pythia.run(nEvents, [&](Pythia8::Pythia* pyPtr) {
+        const Pythia8::Event& event = pyPtr->event;
 
         // Czyszczenie wektorow przed przejsciem do nowej kolizji
         p_id.clear();
@@ -59,14 +106,14 @@ int main() {
         p_phi.clear();
 
         // 5. Selekcja czastek powstalych w zderzeniu
-        for (int i = 0; i < pythia.event.size(); ++i) {
-            const auto& p = pythia.event[i];
+        for (int i = 0; i < event.size(); ++i) {
+            const auto& p = event[i];
 
             // Wymog fizyczny: bierzemy wylacznie czastki stanu koncowego
             if (!p.isFinal()) continue;
 
             p_id.push_back(p.id());
-            p_charge.push_back(p.charge());
+            p_charge.push_back(static_cast<int>(std::lround(p.charge())));
             p_pt.push_back(p.pT());
             p_eta.push_back(p.eta());
             p_phi.push_back(p.phi());
@@ -74,18 +121,39 @@ int main() {
 
         // Zapis calego zderzenia jako jednego wiersza w TTree
         tree->Fill();
+        ++nFilled;
 
-        if ((iEvent + 1) % 500 == 0) {
-            std::cout << "Wygenerowano " << (iEvent + 1) << " / " << nEvents << " zdarzen." << std::endl;
+        if (nFilled % printEvery == 0) {
+            std::cout << "Wygenerowano " << nFilled << " / " << nEvents << " zdarzen." << std::endl;
         }
-    }
+    });
+    const auto tGen = Clock::now();
 
     // 6. Finalizacja zapisu i zwolnienie zasobow
     pythia.stat();      // Podsumowanie przekrojow czynnych
-    tree->Write();      // Zrzut buforow TTree na dysk
+    outFile->cd();
+    tree->Write("", TObject::kOverwrite);  // Zrzut buforow TTree na dysk
     outFile->Close();   // Zamkniecie pliku
-
-    std::cout << "Gotowe! Dane zapisano w events.root" << std::endl;
     delete outFile;
+    const auto tEnd = Clock::now();
+
+    // 7. Podsumowanie czasu wykonania (benchmark)
+    auto sec = [](Clock::duration d) { return std::chrono::duration<double>(d).count(); };
+    const double genTime = sec(tGen - tInit);
+    std::cout << std::fixed << std::setprecision(3);  // pythia.stat() zmienia format cout
+    std::cout << "\n===== BENCHMARK (generate) =====\n"
+              << "Watki:              " << nThreads << "\n"
+              << "Zapisane zdarzenia: " << nFilled << " / " << nEvents << "\n"
+              << "Inicjalizacja:      " << sec(tInit - tStart) << " s\n"
+              << "Generacja:          " << genTime << " s\n"
+              << "Zapis pliku:        " << sec(tEnd - tGen) << " s\n"
+              << "CALKOWITY CZAS:     " << sec(tEnd - tStart) << " s\n"
+              << "Wydajnosc:          " << (genTime > 0 ? nFilled / genTime : 0) << " zdarzen/s\n"
+              << "================================" << std::endl;
+
+    if (nFilled < nEvents) {
+        std::cout << "Uwaga: " << (nEvents - nFilled) << " zdarzen nie wygenerowalo sie poprawnie." << std::endl;
+    }
+    std::cout << "Gotowe! Dane zapisano w events.root" << std::endl;
     return 0;
 }
