@@ -32,94 +32,72 @@ int main(int argc, char* argv[]) {
     const long nEvents = (argc > 1) ? std::stol(argv[1]) : 100000;
     const int  seed    = 12345;  // Staly seed -> kazdy watek dostaje seed, seed+1, ...
 
-    // Liczba dostepnych watkow sprzetowych. Na Linuksie std::thread::hardware_concurrency()
+    // Liczba dostepnych watkow sprzetowych. 
     unsigned int nThreads = std::thread::hardware_concurrency();
     if (nThreads == 0) nThreads = 1;  // Gdy system nie potrafi tego okreslic
     // Opcjonalne nadpisanie i zrobienie innej liczby watkow (np. w celu odtworzenia produkcji na innej maszynie)
     if (argc > 2) nThreads = static_cast<unsigned int>(std::max(1, std::stoi(argv[2])));
 
-    // ROOT bedzie wolany z roznych watkow (choc nigdy jednoczesnie)
     ROOT::EnableThreadSafety();
-
-    // 1. Inicjalizacja rownoleglego generatora Pythia 8
-    //    (kazdy watek ma wlasna, niezalezna instancje Pythii)
     Pythia8::PythiaParallel pythia;
 
-    // 2. Konfiguracja fizyki zderzenia
-    pythia.readString("Beams:idA = 2212");       // Wiazka A: proton (PDG 2212)
-    pythia.readString("Beams:idB = 2212");       // Wiazka B: proton (PDG 2212)
+    // Konfiguracja fizyki zderzenia
+    pythia.readString("Beams:idA = 2212");       // Wiazka A: proton 
+    pythia.readString("Beams:idB = 2212");       // Wiazka B: proton 
     pythia.readString("Beams:eCM = 13600.");     // sqrt(s) = 13.6 TeV (13600 GeV)
-    pythia.readString("SoftQCD:all = on");       // Procesy Minimum Bias (miekka chromodynamika)
+    pythia.readString("SoftQCD:all = on");       // Procesy Minimum Bias 
 
     // Reprodukowalnosc: jawnie ustawiony seed generatora liczb losowych
     pythia.readString("Random:setSeed = on");
     pythia.readString("Random:seed = " + std::to_string(seed));
 
-    // Liczba watkow = wszystkie dostepne
+    // Liczba watkow 
     pythia.readString("Parallelism:numThreads = " + std::to_string(nThreads));
 
     // Reprodukowalnosc: kazdy watek generuje stala liczbe zdarzen (N / liczba_watkow)
-    // ze swoim seedem, niezaleznie od planisty OS (to jest wartosc domyslna,
-    // ustawiamy ja jawnie, bo od niej zalezy powtarzalnosc produkcji).
     pythia.readString("Parallelism:balanceLoad = on");
 
-    // Wyciszenie komunikatow diagnostycznych pojedynczych zdarzen
+    // Wyciszenie komunikatow na ekran 
     pythia.readString("Next:numberCount = 0");
     pythia.readString("Next:numberShowInfo = 0");
     pythia.readString("Next:numberShowProcess = 0");
     pythia.readString("Next:numberShowEvent = 0");
 
-    // Zatwierdzenie konfiguracji generatora
     if (!pythia.init()) {
         std::cerr << "Blad: Inicjalizacja Pythii nie powiodla sie!" << std::endl;
         return 1;
     }
     const auto tInit = Clock::now();
 
-    // 3. Utworzenie binarnego pliku ROOT i drzewa kolumnowego TTree
     TFile* outFile = new TFile("events.root", "RECREATE");
     TTree* tree = new TTree("events", "pp collisions at 13.6 TeV");
 
-    // Bufory na parametry czastek w jednym zdarzeniu
-    std::vector<int>    p_id;      // Kody czastek wg standardu PDG
-    std::vector<int>    p_charge;  // Ladunek elektryczny (-1, 0, +1)
-    std::vector<double> p_pt;      // Ped poprzeczny pT [GeV]
-    std::vector<double> p_eta;     // Pseudorapidity eta
-    std::vector<double> p_phi;     // Kat azymutalny phi [rad], zakres (-pi, pi]
-
-    // Podpiecie buforow pod galezie (kolumny) drzewa TTree
+    std::vector<int>p_id;      // Kody czastek 
+    std::vector<int>p_charge;  // Ladunek elektryczny (-1, 0, +1)
+    std::vector<double>p_pt;   // Ped poprzeczny pT [GeV]
+    std::vector<double>p_eta;  // Pseudorapidity eta
+    std::vector<double>p_phi;  // Kat azymutalny phi [rad], zakres (-pi, pi]
     tree->Branch("id",     &p_id);
     tree->Branch("charge", &p_charge);
     tree->Branch("pt",     &p_pt);
     tree->Branch("eta",    &p_eta);
     tree->Branch("phi",    &p_phi);
-
-    // 4. Glowna petla generowania zderzen (rownolegle)
-    std::cout << "Rozpoczynam generowanie " << nEvents << " zderzen ("
-              << nThreads << " watkow)..." << std::endl;
+    std::cout << "Rozpoczynam generowanie " << nEvents << " zderzen ("<< nThreads << " watkow)..." << std::endl;
 
     long nFilled = 0;
     const long printEvery = std::max(1L, nEvents / 10);
 
-    // Zdarzenia generowane sa rownolegle, ale callback jest domyslnie
-    // synchronizowany (Parallelism:processAsync = off), wiec w danej chwili
-    // tylko jeden watek wypelnia bufory i TTree -> brak wyscigow.
-    // Nieudane zdarzenia nie sa przekazywane do callbacku.
     pythia.run(nEvents, [&](Pythia8::Pythia* pyPtr) {
         const Pythia8::Event& event = pyPtr->event;
 
-        // Czyszczenie wektorow przed przejsciem do nowej kolizji
         p_id.clear();
         p_charge.clear();
         p_pt.clear();
         p_eta.clear();
         p_phi.clear();
 
-        // 5. Selekcja czastek powstalych w zderzeniu
         for (int i = 0; i < event.size(); ++i) {
             const auto& p = event[i];
-
-            // Wymog fizyczny: bierzemy wylacznie czastki stanu koncowego
             if (!p.isFinal()) continue;
 
             p_id.push_back(p.id());
