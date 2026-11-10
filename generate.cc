@@ -89,7 +89,6 @@ int main(int argc, char* argv[]) {
 
     pythia.run(nEvents, [&](Pythia8::Pythia* pyPtr) {
         const Pythia8::Event& event = pyPtr->event;
-
         p_id.clear();
         p_charge.clear();
         p_pt.clear();
