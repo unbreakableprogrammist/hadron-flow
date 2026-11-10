@@ -1,15 +1,11 @@
-# Pliki binarne i dane ROOT
 *.root
+!analysis.root
 
-# Skompilowane programy wykonywalne
 generate
 generate_single_thread
-benchmark_*.log
 analyze
+benchmark_*.log
 
-# Pliki obiektowe i tymczasowe
 *.o
 *.so
 .vscode/
-# Plik wynikowy analizy musi trafic do repozytorium
-!analysis.root

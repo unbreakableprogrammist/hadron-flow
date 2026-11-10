@@ -1,69 +1,42 @@
 # Symulacja i analiza rozkładów cząstek dla pp @ √s = 13.6 TeV (Pythia 8 + ROOT)
 
-Kompletny pipeline: generacja zderzeń proton–proton przy √s = 13.6 TeV generatorem Pythia 8,
-analiza cząstek stanu końcowego w C++/ROOT oraz wizualizacja wyników.
-Treść zadania: `Zadanie wstępne z analizy danych.pdf`.
+Pipeline do generacji zderzeń proton–proton przy √s = 13.6 TeV w Pythii 8, analizy cząstek stanu końcowego w C++/ROOT oraz wizualizacji wyników. Treść zadania znajduje się w pliku `Zadanie wstępne z analizy danych.pdf`.
 
-**Stan prac:** zrobiony jest punkt 1 (generacja danych). Analiza (`analyze.cc` → `analysis.root`)
-i makro rysujące (`draw_plots.C`) będą dodane później.
-
----
+Stan prac: zrealizowany punkt 1 (generacja danych). Program analizujący (`analyze.cc` → `analysis.root`) i makro rysujące (`draw_plots.C`) zostaną dodane w kolejnych krokach.
 
 ## Wymagania
 
-- kompilator z obsługą **C++17** (g++)
-- **ROOT 6** (testowano na 6.40), z dostępnym `root-config`
-- **Pythia 8** (testowano na 8.312), z dostępnym `pythia8-config`.
-  Wersja ≥ 8.309 jest potrzebna tylko do `generate.cc`, bo dopiero od niej istnieje `PythiaParallel`.
-  `generate_single_thread.cc` korzysta wyłącznie ze standardowego API Pythii 8 i działa także na starszych wersjach.
+- kompilator z obsługą C++17 (`g++`)
+- ROOT 6 (testowano na 6.40), z dostępnym `root-config`
+- Pythia 8 (testowano na 8.312), z dostępnym `pythia8-config`
 - `make`
 
-> [!IMPORTANT]
-> **Pythia starsza niż 8.309:** `generate.cc` się nie skompiluje, więc samo `make` (budujące oba
-> programy) zakończy się błędem. Użyj wtedy wersji jednowątkowej:
->
-> ```bash
-> make run_single        # kompiluje i uruchamia tylko generate_single_thread
-> ```
->
-> Fizycznie daje ona ten sam wynik w tym samym pliku `events.root`, tylko wolniej.
-> Wersję Pythii sprawdzisz poleceniem `pythia8-config --version`.
+Wersja Pythii ≥ 8.309 jest potrzebna do `generate.cc`, ponieważ korzysta on z klasy `PythiaParallel`. Na starszych wersjach Pythii 8 samo `make` nie skompiluje `generate.cc` — należy wtedy użyć wersji jednowątkowej (`make run_single`), która korzysta wyłącznie ze standardowego API Pythii i daje ten sam wynik w pliku `events.root`. Wersję można sprawdzić poleceniem `pythia8-config --version`.
 
-`pythia8-config` i `root-config` muszą być w `PATH`, np. po aktywacji środowiska conda z ROOT i Pythią
-(`conda activate hep-env`).
-
----
+ Narzędzia `pythia8-config` i `root-config` muszą być dostępne w `PATH` (np. po aktywacji środowiska `conda activate hep-env`).
 
 ## Opis plików
 
-| Plik | Opis |
-|---|---|
-| `generate.cc` | Generator zdarzeń, **wersja wielowątkowa** (`Pythia8::PythiaParallel`, wszystkie dostępne wątki procesora). Wynik: `events.root`. |
-| `generate_single_thread.cc` | Generator zdarzeń, **wersja jednowątkowa** (klasyczna pętla `pythia.next()`). Wynik: `events.root`. |
-| `Makefile` | Kompilacja i uruchamianie programów. |
-| `Zadanie wstępne z analizy danych.pdf` | Treść zadania. |
+- `generate.cc` – generator zdarzeń w wersji wielowątkowej (`Pythia8::PythiaParallel`, domyślnie wszystkie wątki procesora). Zapisuje wynik do `events.root`.
+- `generate_single_thread.cc` – generator zdarzeń w wersji jednowątkowej (standardowa pętla `pythia.next()`). Zapisuje wynik do `events.root`.
+- `Makefile` – reguły kompilacji i uruchamiania.
+- `Zadanie wstępne z analizy danych.pdf` – treść zadania.
 
-Oba generatory są równoważne fizycznie i zapisują dane w **tym samym formacie do tego samego pliku
-`events.root`**. Można użyć dowolnego z nich, a dalsza analiza zawsze czyta `events.root`.
-Każde uruchomienie nadpisuje poprzedni plik.
+Oba generatory zapisują dane w tym samym formacie do pliku `events.root`, z którego korzysta dalsza analiza.
 
-### Konfiguracja generacji (wspólna dla obu programów)
+### Konfiguracja Pythii
 
-| Ustawienie Pythii | Wartość | Znaczenie |
-|---|---|---|
-| `Beams:idA`, `Beams:idB` | `2212` | zderzenia proton–proton |
-| `Beams:eCM` | `13600.` | √s = 13.6 TeV |
-| `SoftQCD:all` | `on` | tryb *minimum bias* |
-| `Random:setSeed`, `Random:seed` | `on`, `12345` | stały seed, czyli produkcja reprodukowalna |
-| liczba zdarzeń | `100000` (domyślnie) | zgodnie z zadaniem |
+- `Beams:idA = 2212`, `Beams:idB = 2212` – zderzenia proton–proton
+- `Beams:eCM = 13600.` – energia w układzie środka masy √s = 13.6 TeV
+- `SoftQCD:all = on` – procesy minimum bias
+- `Random:setSeed = on`, `Random:seed = 12345` – stały seed zapewniający reprodukowalność
+- domyślna liczba zdarzeń: `100000`
 
-Zapisywane są **wyłącznie cząstki stanu końcowego** (`particle.isFinal()`), więc w pliku
-nie ma cząstek pośrednich.
+Do pliku zapisywane są wyłącznie cząstki stanu końcowego (`p.isFinal()`).
 
-### Format pliku `events.root`
+### Struktura pliku `events.root`
 
-Drzewo `TTree` o nazwie `events`. **Jeden wpis odpowiada jednemu zderzeniu.** Gałęzie to wektory,
-w których element `i` opisuje `i`-tą cząstkę końcową:
+Drzewo `TTree` o nazwie `events` (jeden wpis = jedno zderzenie). Gałęzie są wektorami odpowiadającymi kolejnym cząstkom końcowym w danym zdarzeniu:
 
 | Gałąź | Typ | Opis |
 |---|---|---|
@@ -73,94 +46,51 @@ w których element `i` opisuje `i`-tą cząstkę końcową:
 | `eta` | `vector<double>` | pseudorapidity η |
 | `phi` | `vector<double>` | kąt azymutalny φ [rad], zakres (−π, π] |
 
-Oprócz drzewa plik zawiera obiekt `production_info` (`TNamed`) z parametrami produkcji:
-programem, seedem, liczbą wątków, liczbą zdarzeń i komendą, którą można ją odtworzyć.
-Podgląd w ROOT:
+Dodatkowo w pliku zapisywany jest obiekt `production_info` (`TNamed`) z informacją o użytym programie, seedzie, liczbie wątków, liczbie zdarzeń i komendzie pozwalającej odtworzyć produkcję:
 
 ```cpp
-TFile f("events.root"); f.Get("production_info")->Print();
+TFile f("events.root");
+f.Get("production_info")->Print();
 ```
-
----
 
 ## Kompilacja i uruchamianie
 
 ```bash
 make                  # kompiluje oba generatory (wymaga Pythii >= 8.309)
-make run              # generator wielowątkowy  -> events.root (100 000 zdarzeń, Pythia >= 8.309)
-make run_single       # generator jednowątkowy  -> events.root (100 000 zdarzeń, dowolna Pythia 8)
-make clean            # usuwa skompilowane programy
+make run              # uruchamia generator wielowątkowy -> events.root
+make run_single       # uruchamia generator jednowątkowy -> events.root
+make clean            # usuwa pliki wykonywalne i logi
 ```
 
-Liczbę zdarzeń można zmienić zmienną `N`, np. `make run N=1000`.
-
-Programy można też uruchomić bezpośrednio:
+Liczbę zdarzeń można zmienić parametrem `N`, np. `make run N=1000`, albo uruchamiając programy bezpośrednio:
 
 ```bash
-./generate [liczba_zdarzen] [liczba_watkow]   # domyślnie: 100000, wszystkie wątki
-./generate_single_thread [liczba_zdarzen]     # domyślnie: 100000
+./generate [liczba_zdarzen] [liczba_watkow]
+./generate_single_thread [liczba_zdarzen]
 ```
 
-Po zakończeniu każdy program wypisuje czas inicjalizacji, czas generacji, czas zapisu
-i wydajność (zdarzenia/s). Do porównania obu wersji służy pomocniczy cel `make benchmark`.
+Cel `make benchmark` uruchamia obie wersje po kolei i wypisuje zestawienie czasów wykonania.
 
----
+## Porównanie wersji jedno- i wielowątkowej
 
-## Dwie wersje generatora
+Ponieważ zderzenia są od siebie niezależne, `generate.cc` zrównolegla generację za pomocą `PythiaParallel`. Dla każdego wątku `k` tworzona jest osobna instancja Pythii z seedem `12345 + k`, a opcja `Parallelism:balanceLoad = on` przydziela każdemu wątkowi stałą liczbę zdarzeń (`N / liczba_watkow`). Callback wypełniający `TTree` jest wywoływany przez Pythię sekwencyjnie (`Parallelism:processAsync = off`), dzięki czemu zapis do drzewa ROOT nie powoduje wyścigów danych.
 
-### Po co wersja wielowątkowa
-
-Zderzenia są od siebie **niezależne**, więc można je generować równolegle. Wersja jednowątkowa
-przez kilka minut obciąża tylko jeden rdzeń, a pozostałe stoją bezczynnie.
-`generate.cc` wykorzystuje wszystkie wątki procesora.
-
-### Jak to działa
-
-- Liczba wątków jest pobierana z systemu przez `std::thread::hardware_concurrency()`.
-- `PythiaParallel` tworzy **osobną instancję Pythii dla każdego wątku**, z seedem
-  `12345 + k` dla wątku `k`.
-- Przy `Parallelism:balanceLoad = on` każdy wątek generuje **stałą liczbę zdarzeń** (N / liczba wątków).
-- Zapis do `TTree` odbywa się w funkcji wywoływanej przez Pythię **po kolei**, nigdy przez dwa
-  wątki naraz (`Parallelism:processAsync = off`), więc nie ma wyścigów i nie trzeba mutexów.
-
-### Wpływ na szybkość
-
-Pomiar na Intel Core i7-4510U (2 rdzenie / 4 wątki):
+Pomiar na procesorze Intel Core i7-4510U (2 rdzenie / 4 wątki) dla 100 000 zdarzeń:
 
 | | 1 wątek | 4 wątki |
 |---|---|---|
 | Inicjalizacja Pythii | ~36 s | ~68 s |
 | Wydajność generacji | ~280 zdarzeń/s | ~650 zdarzeń/s |
 
-- Sama **generacja jest ~2.3× szybsza**. Procesor ma tylko 2 fizyczne rdzenie,
-  dlatego przyspieszenie jest mniejsze niż 4×.
-- **Inicjalizacja jest dłuższa**, bo każda instancja Pythii inicjalizuje się osobno.
-  Przy małej liczbie zdarzeń (rzędu tysięcy) wersja jednowątkowa jest więc szybsza.
-  Przy docelowych 100 000 zdarzeń wersja wielowątkowa wyraźnie wygrywa.
+Inicjalizacja wersji wielowątkowej trwa dłużej (każda instancja inicjalizuje się osobno), ale sama generacja jest ok. 2.3× szybsza, co przy 100 000 zdarzeń daje wyraźny zysk czasowy.
 
-### Reprodukowalność produkcji
+### Reprodukowalność
 
-| | Co jest powtarzalne |
-|---|---|
-| `generate_single_thread` | **Wszystko.** Ten sam seed daje identyczny plik, łącznie z kolejnością zdarzeń. |
-| `generate` | **Zbiór zdarzeń**, przy tej samej liczbie wątków. Każdy wątek ma stały seed i generuje stałą liczbę zdarzeń, więc powstają dokładnie te same zdarzenia. Zmienia się tylko **kolejność wierszy** w `TTree`, bo zależy od planisty systemu operacyjnego. Histogramy (`analysis.root`) wychodzą więc identyczne. |
-
-Wynik wersji wielowątkowej zależy od **liczby wątków**. Na komputerze z inną liczbą wątków
-powstanie inny, statystycznie równoważny zbiór zdarzeń. Aby dokładnie odtworzyć produkcję,
-podaj liczbę wątków zapisaną w `production_info`:
-
-```bash
-./generate 100000 4
-```
-
----
+- `generate_single_thread` przy stałym seedzie daje zawsze identyczny plik `events.root` (włącznie z kolejnością zdarzeń).
+- `generate` przy tej samej liczbie wątków generuje dokładnie ten sam zbiór zdarzeń (każdy wątek ma własny seed i stałą liczbę zdarzeń do wygenerowania). Kolejność wpisów w `TTree` może się różnić między uruchomieniami, ale wynikowe histogramy w `analysis.root` są identyczne. Aby odtworzyć ten sam zbiór zdarzeń na komputerze z inną liczbą rdzeni, należy przekazać liczbę wątków jako drugi argument (np. `./generate 100000 4`).
 
 ## Uwagi techniczne
 
-- Kod jest zgodny z C++17 (`-std=c++17` w `Makefile`). `root-config --cflags` dokłada jednak
-  `-std=c++20`, jeśli ROOT został zbudowany w C++20, i wtedy ta flaga ma pierwszeństwo.
-  Mieszanie standardów z bibliotekami ROOT nie jest zalecane, dlatego zostawiono flagi z `root-config`.
-- `SoftQCD:all` obejmuje także zderzenia elastyczne. Dają one zdarzenia z dwoma protonami
-  przy bardzo dużym |η|, poza zakresem histogramów.
-- Pythia zwraca φ w zakresie (−π, π]. Zadanie wymaga histogramu φ w zakresie 0–π,
-  co zostanie uwzględnione w programie analizującym.
+- W `Makefile` ustawiono `-std=c++17`, jednak `root-config --cflags` może dopisać flagę standardu, z jakim zbudowano ROOT (np. `-std=c++20`), aby zachować zgodność ABI z nagłówkami ROOT.
+- `SoftQCD:all` obejmuje również zderzenia elastyczne (dwa protony o bardzo dużym |η|, poza zakresem histogramów).
+- Kąt φ z Pythii jest w przedziale (−π, π]. Wymagany w zadaniu zakres (0, π) będzie obsługiwany na etapie analizy.
