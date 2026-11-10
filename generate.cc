@@ -131,7 +131,7 @@ int main(int argc, char* argv[]) {
     delete outFile;
     const auto tEnd = Clock::now();
 
-    // 7. Podsumowanie czasu wykonania (benchmark)
+    // benchmark
     auto sec = [](Clock::duration d) { return std::chrono::duration<double>(d).count(); };
     const double genTime = sec(tGen - tInit);
     std::cout << std::fixed << std::setprecision(3);  // pythia.stat() zmienia format cout
