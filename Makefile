@@ -30,8 +30,10 @@ run_single: generate_single_thread
 benchmark: generate generate_single_thread
 	@./generate_single_thread $(N) > benchmark_single.log 2>&1
 	@./generate $(N) > benchmark_multi.log 2>&1
-	@sed -n '/===== BENCHMARK/,/^=====/p' benchmark_single.log
-	@sed -n '/===== BENCHMARK/,/^=====/p' benchmark_multi.log
+	@echo "=== generate_single_thread ==="
+	@grep -E '^(Zapisano |Czas: |Uwaga: )' benchmark_single.log
+	@echo "=== generate ==="
+	@grep -E '^(Zapisano |Czas: |Uwaga: )' benchmark_multi.log
 	@echo "Pelne logi: benchmark_single.log, benchmark_multi.log"
 
 clean:

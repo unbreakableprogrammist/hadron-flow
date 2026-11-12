@@ -123,16 +123,10 @@ int main(int argc, char* argv[]) {
     double writeTime = std::chrono::duration<double>(tEnd - tGen).count();
     double totalTime = std::chrono::duration<double>(tEnd - tStart).count();
 
-    std::cout << std::fixed << std::setprecision(3); // pythia.stat() przestawia format cout
-    std::cout << "\n===== BENCHMARK (generate) =====\n"
-              << "Watki:              " << nThreads << "\n"
-              << "Zapisane zdarzenia: " << nFilled << " / " << nEvents << "\n"
-              << "Inicjalizacja:      " << initTime << " s\n"
-              << "Generacja:          " << genTime << " s\n"
-              << "Zapis pliku:        " << writeTime << " s\n"
-              << "CALKOWITY CZAS:     " << totalTime << " s\n"
-              << "Wydajnosc:          " << (genTime > 0 ? nFilled / genTime : 0) << " zdarzen/s\n"
-              << "================================" << std::endl;
+    std::cout << std::fixed << std::setprecision(2); 
+    std::cout << "\nZapisano " << nFilled << " / " << nEvents << " zdarzen (watki: " << nThreads << ").\n"
+              << "Czas: inicjalizacja " << initTime << " s, generacja " << genTime
+              << " s, zapis " << writeTime << " s, razem " << totalTime << " s." << std::endl;
 
     if (nFilled < nEvents) {
         std::cout << "Uwaga: " << (nEvents - nFilled) << " zdarzen nie wygenerowalo sie poprawnie." << std::endl;
