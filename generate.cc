@@ -75,8 +75,6 @@ int main(int argc, char* argv[]) {
     long nFilled = 0;
     long printEvery = std::max(1L, nEvents / 10);
 
-    // Callback wywolywany synchronicznie (domyslnie processAsync = off),
-    // wiec zapis do TTree nie wymaga dodatkowej synchronizacji.
     pythia.run(nEvents, [&](Pythia8::Pythia* pyPtr) {
         const Pythia8::Event& event = pyPtr->event;
 
