@@ -149,7 +149,7 @@ Kilka rzeczy, na które trzeba było uważać:
 
 ## Skąd wielowątkowość i benchmark
 
-Na początku był tylko `generate_single_thread.cc` – najprostsza wersja, wzorowana na przykładach z Pythii. Przy pierwszych testach wyszło, że **wąskim gardłem jest sama generacja w Pythii**: na starszym laptopie (i7-4510U) szło to ok. 280 zdarzeń/s, czyli 100k zdarzeń to kilka minut, a każda poprawka w generatorze oznaczała kolejne czekanie. Sama analiza 100k zdarzeń trwa kilka sekund, więc tam nie było czego przyspieszać.
+Na początku był tylko `generate_single_thread.cc` – najprostsza wersja, wzorowana na przykładach z Pythii. Przy pierwszych testach wyszło, że **wąskim gardłem jest sama generacja w Pythii**: jeden wątek daje ok. 1600 zdarzeń/s na M5, a na starszym laptopie dużo mniej, więc 100k zdarzeń to od ponad minuty do kilku minut. Każda poprawka w generatorze oznaczała kolejne czekanie. Sama analiza 100k zdarzeń trwa kilka sekund, więc tam nie było czego przyspieszać.
 
 Zderzenia są od siebie całkowicie niezależne, więc generacja to idealny kandydat do zrównoleglenia. Pythia od wersji 8.309 ma do tego gotową klasę `PythiaParallel` (dokumentacja „Parallelism” + przykłady `main221`–`main223`), więc nie trzeba było pisać własnych wątków:
 
@@ -171,23 +171,11 @@ Wersję jednowątkową zostawiliśmy celowo: działa też na starszych Pythiach 
 | **Razem** | **69.61 s** | **30.34 s** | **2.3×** |
 | Wydajność generacji | ~1630 zdarzeń/s | ~6200 zdarzeń/s | |
 
-**Intel Core i7-4510U** – 2 rdzenie / 4 wątki:
-
-| | `generate_single_thread` (1 wątek) | `generate` (4 wątki) | Przyspieszenie |
-|---|---:|---:|---:|
-| Inicjalizacja Pythii | ~36 s | ~68 s | 0.5× |
-| Generacja | ≈ 357 s* | ≈ 154 s* | **2.3×** |
-| **Razem** | **≈ 6.5 min*** | **≈ 3.7 min*** | **1.8×** |
-| Wydajność generacji | ~280 zdarzeń/s | ~650 zdarzeń/s | |
-
-\* czasy wyliczone z wydajności (100 000 / zdarzenia na sekundę), a nie zmierzone bezpośrednio.
-
 **Wnioski:**
 
 - Inicjalizacja wersji wielowątkowej trwa dłużej, bo każda instancja Pythii (po jednej na wątek) inicjalizuje się osobno. Przy małej liczbie zdarzeń (np. `N=1000`) wersja jednowątkowa jest przez to nawet szybsza.
-- Przy docelowych 100k zdarzeń zysk jest wyraźny: na M5 cały przebieg skraca się z ~70 s do ~30 s, a na starym i7 z ok. 6.5 do ok. 3.7 minuty.
-- Przyspieszenie generacji na M5 (3.8×) jest mniejsze niż liczba wątków (10). Tylko 4 rdzenie to rdzenie wydajne, a pozostałe 6 to wolniejsze rdzenie energooszczędne. Do tego MacBook Air nie ma wentylatora i przy dłuższym obciążeniu najpewniej zbija taktowanie (dla `N=10000` wyszło ~7600 zdarzeń/s, a dla 100k ~6200 zdarzeń/s).
-- Na i7 dwa fizyczne rdzenie z Hyper-Threadingiem dają ok. 2.3× – mniej więcej tyle, ile można się spodziewać po 2 rdzeniach.
+- Przy docelowych 100k zdarzeń zysk jest wyraźny: cały przebieg skraca się z ~70 s do ~30 s.
+- Przyspieszenie generacji (3.8×) jest mniejsze niż liczba wątków (10). Tylko 4 rdzenie to rdzenie wydajne, a pozostałe 6 to wolniejsze rdzenie energooszczędne. Do tego MacBook Air nie ma wentylatora i przy dłuższym obciążeniu najpewniej zbija taktowanie (dla `N=10000` wyszło ~7600 zdarzeń/s, a dla 100k ~6200 zdarzeń/s).
 
 ## Reprodukowalność
 
