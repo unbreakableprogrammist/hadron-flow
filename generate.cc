@@ -70,7 +70,7 @@ int main(int argc, char* argv[]) {
     tree->Branch("eta", &p_eta);
     tree->Branch("phi", &p_phi);
 
-    std::cout << "Generowanie " << nEvents << " zdarzen (" << nThreads << " watki)..." << std::endl;
+    std::cout << "Generowanie " << nEvents << " zdarzen (watki: " << nThreads << ")..." << std::endl;
 
     long nFilled = 0;
     long printEvery = std::max(1L, nEvents / 10);
