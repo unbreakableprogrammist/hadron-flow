@@ -31,12 +31,12 @@ TCanvas* drawObservable(TFile* file, const std::string& prefix, const std::strin
                         bool logY, double xMaxId = -1.0) {
     TH1D* h_all = loadHist(file, prefix + "_all", kBlack, 1, 2);
     TH1D* h_ch = loadHist(file, prefix + "_ch", kBlue + 1, 1, (prefix == "hN" ? 1 : 2));
-    TH1D* h_pip = loadHist(file, prefix + "_pip", kRed + 1, 1, 2);
-    TH1D* h_pim = loadHist(file, prefix + "_pim", kRed + 1, 2, 2);
-    TH1D* h_Kp = loadHist(file, prefix + "_Kp", kGreen + 2, 1, 2);
-    TH1D* h_Km = loadHist(file, prefix + "_Km", kGreen + 2, 2, 2);
-    TH1D* h_p = loadHist(file, prefix + "_p", kAzure + 2, 1, 2);
-    TH1D* h_pbar = loadHist(file, prefix + "_pbar", kAzure + 2, 2, 2);
+    TH1D* h_pip = loadHist(file, prefix + "_pip", kRed + 2, 1, 2);
+    TH1D* h_pim = loadHist(file, prefix + "_pim", kOrange + 7, 1, 2);
+    TH1D* h_Kp = loadHist(file, prefix + "_Kp", kGreen + 3, 1, 2);
+    TH1D* h_Km = loadHist(file, prefix + "_Km", kSpring - 1, 1, 2);
+    TH1D* h_p = loadHist(file, prefix + "_p", kBlue + 2, 1, 2);
+    TH1D* h_pbar = loadHist(file, prefix + "_pbar", kCyan + 1, 1, 2);
 
     if (!h_all || !h_ch || !h_pip || !h_pim || !h_Kp || !h_Km || !h_p || !h_pbar) {
         return nullptr;

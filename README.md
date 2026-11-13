@@ -148,7 +148,7 @@ Kilka rzeczy, na które trzeba było uważać:
 
 Makro `draw_plots.C` otwiera `analysis.root` i dla każdej z 4 zmiennych (`N`, `p_T`, `η`, `φ`) tworzy osobny `TCanvas` podzielony na dwa panele:
 - **lewy panel**: porównanie wszystkich cząstek końcowych (`all`) i naładowanych (`ch`),
-- **prawy panel**: porównanie zidentyfikowanych hadronów (`π⁺`, `π⁻`, `K⁺`, `K⁻`, `p`, `p̄` – cząstki linią ciągłą, antycząstki przerywaną).
+- **prawy panel**: porównanie zidentyfikowanych hadronów (`π⁺`, `π⁻`, `K⁺`, `K⁻`, `p`, `p̄` – pary ciemniejszy/jaśniejszy odcień dla cząstki i antycząstki).
 
 Wykresy zapisywane są do katalogu `plots/` jako osobne pliki PNG (`dist_N.png`, `dist_pT.png`, `dist_eta.png`, `dist_phi.png`) oraz wspólny wielostronicowy PDF (`all_distributions.pdf`).
 
