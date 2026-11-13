@@ -1,13 +1,6 @@
 # Symulacja i analiza rozkładów cząstek dla pp @ √s = 13.6 TeV (Pythia 8 + ROOT)
 
-Projekt w ramach zadania wstępnego z analizy danych (treść: `Zadanie wstępne z analizy danych.pdf`). Generujemy ok. 100 000 zderzeń proton–proton przy √s = 13.6 TeV w Pythii 8, a potem w C++/ROOT robimy histogramy krotności, p_T, η i φ dla różnych rodzajów cząstek stanu końcowego.
-
-**Stan prac:**
-
-- [x] 1) Generacja danych (Pythia 8) – `generate.cc`, `generate_single_thread.cc` → `events.root`
-- [x] 2) Analiza (C++/ROOT) – `analyze.cc`
-- [x] 3) Histogramy i plik wyjściowy – `analysis.root` (32 histogramy)
-- [ ] 4) Makro rysujące `draw_plots.C` + prezentacja PDF
+Projekt w ramach zadania wstępnego z analizy danych (treść: `Zadanie wstępne z analizy danych.pdf`). Generujemy 100 000 zderzeń proton–proton przy √s = 13.6 TeV w Pythii 8, w C++/ROOT liczymy histogramy krotności, p_T, η i φ dla cząstek stanu końcowego (`analysis.root`), a na koniec rysujemy rozkłady makrem `draw_plots.C`.
 
 ## Spis plików
 
@@ -16,8 +9,10 @@ Projekt w ramach zadania wstępnego z analizy danych (treść: `Zadanie wstępne
 | `generate.cc` | generator wielowątkowy (`Pythia8::PythiaParallel`) → `events.root` |
 | `generate_single_thread.cc` | ten sam generator w wersji jednowątkowej (zwykła pętla `pythia.next()`) → `events.root` |
 | `analyze.cc` | czyta `events.root`, wypełnia histogramy i zapisuje je do `analysis.root` |
+| `draw_plots.C` | makro ROOT rysujące histogramy z `analysis.root` i eksportujące je do `plots/` (`.png` + `.pdf`) |
 | `Makefile` | kompilacja, uruchamianie i benchmark |
 | `analysis.root` | gotowy wynik analizy dla 100 000 zdarzeń (seed 12345) |
+| `plots/` | wygenerowane wykresy (`dist_N.png`, `dist_pT.png`, `dist_eta.png`, `dist_phi.png`, `all_distributions.pdf`) |
 
 `events.root` nie jest w repozytorium (ok. 350 MB dla 100k zdarzeń, jest w `.gitignore`) – można go w każdej chwili odtworzyć, patrz niżej.
 
@@ -45,9 +40,10 @@ root-config --version
 make              # kompiluje generate, generate_single_thread i analyze
 make run          # etap 1: generuje 100 000 zdarzeń (wielowątkowo) -> events.root
 make analysis     # etap 2: analiza events.root -> analysis.root
+make plots        # etap 3: rysuje wykresy z analysis.root -> plots/
 ```
 
-Na Apple M5 (10 wątków) generacja 100k zdarzeń trwa ok. pół minuty, a analiza kilka sekund.
+Na Apple M5 (10 wątków) generacja 100k zdarzeń trwa ok. pół minuty, analiza kilka sekund, a wygenerowanie wykresów poniżej 2 sekund.
 
 ### Wszystkie cele `Makefile`
 
@@ -57,8 +53,9 @@ Na Apple M5 (10 wątków) generacja 100k zdarzeń trwa ok. pół minuty, a anali
 | `make run` | generacja wielowątkowa | `./generate 100000` |
 | `make run_single` | generacja jednowątkowa | `./generate_single_thread 100000` |
 | `make analysis` | analiza | `./analyze events.root analysis.root` |
+| `make plots` | rysowanie wykresów PNG i PDF | `root -l -b -q 'draw_plots.C("analysis.root")'` |
 | `make benchmark` | porównanie czasów obu generatorów | – |
-| `make clean` | usuwa binarki i logi benchmarku (pliki `.root` zostają) | – |
+| `make clean` | usuwa binarki i logi benchmarku (pliki `.root` i `plots/` zostają) | – |
 
 Liczbę zdarzeń zmienia się zmienną `N` (**bez spacji** wokół `=`), np. szybki test:
 
@@ -67,12 +64,13 @@ make run N=1000
 make benchmark N=10000
 ```
 
-Programy można też wołać bezpośrednio:
+Programy i makro można też wołać bezpośrednio:
 
 ```bash
 ./generate [liczba_zdarzen] [liczba_watkow]   # domyślnie 100000 i wszystkie wątki CPU
 ./generate_single_thread [liczba_zdarzen]     # domyślnie 100000
 ./analyze [plik_wejsciowy] [plik_wyjsciowy]   # domyślnie events.root i analysis.root
+root -l -b -q draw_plots.C                    # domyślnie czyta analysis.root, zapisuje do plots/
 ```
 
 Oba generatory zapisują do `events.root` w tym samym formacie, więc `analyze` działa z każdym z nich. Pliki wyjściowe otwierane są w trybie `RECREATE`, czyli kolejne uruchomienie po prostu je nadpisuje (nic się nie dokleja). Wyjątkiem jest `make benchmark`, który liczy w tymczasowym katalogu i **nie rusza** głównego `events.root`.
@@ -146,6 +144,21 @@ Kilka rzeczy, na które trzeba było uważać:
 - **Jedna cząstka może trafić do kilku kategorii** (π⁺ jest jednocześnie w `all`, `ch` i `pip`), dlatego są to osobne `if`/`switch`, a nie jeden łańcuch `else if`.
 - **Kąt φ** – Pythia daje φ ∈ (−π, π], a histogram w zadaniu ma zakres [0, π]. Zderzenia pp są symetryczne azymutalnie, więc zamiast wyrzucać połowę cząstek (φ < 0) „składamy” rozkład, biorąc |φ| (funkcja `foldPhi`). Wartość równą dokładnie π przesuwamy minimalnie w dół (`std::nextafter`), bo w ROOT ostatni bin jest otwarty z prawej i π wpadłoby do overflow.
 - **Overflow** – dla `hN_all` ok. 10% zdarzeń ma więcej niż 400 cząstek końcowych (liczymy w pełnej akceptancji, razem z fotonami), a dla `hN_ch` to tylko kilkadziesiąt zdarzeń na 100k. Zakres jest narzucony w zadaniu, więc go nie zmieniamy – te zdarzenia są w binie overflow, a program wypisuje ich liczbę. Podobnie w `hEta_*` cząstki z |η| > 5 (głównie z dyfrakcji i elastycznych zderzeń) są w under/overflow.
+
+### Etap 4 – wizualizacja (`draw_plots.C`)
+
+Makro `draw_plots.C` otwiera `analysis.root` i dla każdej z 4 zmiennych (`N`, `p_T`, `η`, `φ`) tworzy osobny `TCanvas` podzielony na dwa panele:
+- **lewy panel**: porównanie wszystkich cząstek końcowych (`all`) i naładowanych (`ch`),
+- **prawy panel**: porównanie zidentyfikowanych hadronów (`π⁺`, `π⁻`, `K⁺`, `K⁻`, `p`, `p̄` – cząstki linią ciągłą, antycząstki przerywaną).
+
+Wykresy zapisywane są do katalogu `plots/` jako osobne pliki PNG (`dist_N.png`, `dist_pT.png`, `dist_eta.png`, `dist_phi.png`) oraz wspólny wielostronicowy PDF (`all_distributions.pdf`).
+
+Krótki opis otrzymanych rozkładów:
+
+- **Krotność (`dist_N.png`)** – ponieważ zbieramy wszystkie cząstki końcowe w pełnym kącie bryłowym, całkowity ładunek w każdym zdarzeniu musi być równy ładunkowi dwóch początkowych protonów (`Q = +2`). Z zachowania ładunku wynika, że liczba cząstek naładowanych `N_ch` jest **zawsze parzysta** (`2, 4, 6, ...`), a nieparzyste biny są puste (dlatego na skali logarytmicznej linia spada co 2 biny do zera; w makrze rysujemy `hN_ch` cieńszą linią i nakładamy `hN_all` na wierzchu, żeby nie zasłonić czarnej krzywej). Wysoki pik dla `N_ch = 2` pochodzi ze zderzeń elastycznych `pp → pp`.
+- **Pęd poprzeczny (`dist_pT.png`)** – dla małych `p_T` widać gładki, wykładniczy spadek (procesy miękkie `SoftQCD`), który dla wyższych pędów przechodzi w ogon potęgowy. Widać też różnicę w produkcji zależną od masy: najwięcej jest najlżejszych pionów `π±`, mniej kaonów `K±`, a najmniej cięższych protonów i antyprotonów `p/p̄`.
+- **Pseudorapidity (`dist_eta.png`)** – rozkład jest symetryczny względem `η = 0`. Lekkie wcięcie („siodło”) w okolicy `η ≈ 0` bierze się z przeliczenia (jakobianu) między pospiesznością `y` a pseudorapidity `η` dla cząstek o niezerowej masie.
+- **Kąt azymutalny (`dist_phi.png`)** – rozkład w `[0, π]` jest płaski, bo zderzenia `pp` są symetryczne wokół osi wiązki. Na prawym panelu linia dla protonów `p` leży trochę wyżej niż dla antyprotonów `p̄` (i delikatnie `π⁺ > π⁻`, `K⁺ > K⁻`), co wynika z zachowania liczby barionowej (`B = +2`) i ładunku (`Q = +2`) ze stanu początkowego `pp`.
 
 ## Skąd wielowątkowość i benchmark
 

@@ -8,7 +8,7 @@ ROOT_LIB := $(shell root-config --libs)
 
 N ?= 100000
 
-.PHONY: all clean run run_single analysis benchmark
+.PHONY: all clean run run_single analysis plots benchmark
 
 all: generate generate_single_thread analyze
 
@@ -31,6 +31,10 @@ run_single: generate_single_thread
 # Etap 2: analiza events.root -> analysis.root
 analysis: analyze
 	./analyze events.root analysis.root
+
+# Etap 3: rysowanie wykresow z analysis.root -> plots/
+plots:
+	root -l -b -q 'draw_plots.C("analysis.root")'
 
 # Benchmark liczy sie w osobnym katalogu, zeby nie nadpisac glownego events.root
 benchmark: generate generate_single_thread

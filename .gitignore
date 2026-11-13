@@ -9,3 +9,4 @@ benchmark_*.log
 *.o
 *.so
 .vscode/
+.DS_Store
