@@ -14,7 +14,7 @@ Projekt w ramach zadania wstępnego z analizy danych (treść: `Zadanie wstępne
 | `analysis.root` | gotowy wynik analizy dla 100 000 zdarzeń (seed 12345) |
 | `plots/` | wygenerowane wykresy (`dist_N.png`, `dist_pT.png`, `dist_eta.png`, `dist_phi.png`, `all_distributions.pdf`) |
 
-`events.root` nie jest w repozytorium (ok. 350 MB dla 100k zdarzeń, jest w `.gitignore`) – można go w każdej chwili odtworzyć, patrz niżej.
+`events.root` nie jest w repozytorium (ok. 350 MB dla 100k zdarzeń, nie mieścił się na github)
 
 ## Wymagania
 
@@ -73,9 +73,8 @@ Programy i makro można też wołać bezpośrednio:
 root -l -b -q draw_plots.C                    # domyślnie czyta analysis.root, zapisuje do plots/
 ```
 
-Oba generatory zapisują do `events.root` w tym samym formacie, więc `analyze` działa z każdym z nich. Pliki wyjściowe otwierane są w trybie `RECREATE`, czyli kolejne uruchomienie po prostu je nadpisuje (nic się nie dokleja). Wyjątkiem jest `make benchmark`, który liczy w tymczasowym katalogu i **nie rusza** głównego `events.root`.
+Oba generatory zapisują do `events.root` w tym samym formacie, więc `analyze` działa z każdym z nich. Pliki wyjściowe otwierane są w trybie `RECREATE`, czyli kolejne uruchomienie po prostu je nadpisuje. Wyjątkiem jest `make benchmark`, który liczy w tymczasowym katalogu i **nie rusza** głównego `events.root`.
 
-Pythia w trakcie generacji wypisuje czasem pojedyncze ostrzeżenia/błędy (np. `BeamRemnants::setKinematics: kinematics construction failed`). To normalne – Pythia odrzuca takie zdarzenie, a program na końcu pokazuje, ile zdarzeń faktycznie zapisano.
 
 ### Sprawdzenie wyników
 
@@ -140,10 +139,10 @@ Do pliku dopisujemy też `production_info` (`TNamed`) z nazwą programu, seedem,
 
 Kilka rzeczy, na które trzeba było uważać:
 
-- **Krotność `hN_*`** – licznik każdej kategorii zerujemy na początku zdarzenia, a do histogramu wpisujemy go po przejściu wszystkich cząstek. Dzięki temu zdarzenia bez np. kaonów trafiają do binu `N = 0`, a nie znikają z rozkładu.
-- **Jedna cząstka może trafić do kilku kategorii** (π⁺ jest jednocześnie w `all`, `ch` i `pip`), dlatego są to osobne `if`/`switch`, a nie jeden łańcuch `else if`.
-- **Kąt φ** – Pythia daje φ ∈ (−π, π], a histogram w zadaniu ma zakres [0, π]. Zderzenia pp są symetryczne azymutalnie, więc zamiast wyrzucać połowę cząstek (φ < 0) „składamy” rozkład, biorąc |φ| (funkcja `foldPhi`). Wartość równą dokładnie π przesuwamy minimalnie w dół (`std::nextafter`), bo w ROOT ostatni bin jest otwarty z prawej i π wpadłoby do overflow.
-- **Overflow** – dla `hN_all` ok. 10% zdarzeń ma więcej niż 400 cząstek końcowych (liczymy w pełnej akceptancji, razem z fotonami), a dla `hN_ch` to tylko kilkadziesiąt zdarzeń na 100k. Zakres jest narzucony w zadaniu, więc go nie zmieniamy – te zdarzenia są w binie overflow, a program wypisuje ich liczbę. Podobnie w `hEta_*` cząstki z |η| > 5 (głównie z dyfrakcji i elastycznych zderzeń) są w under/overflow.
+- **Krotność `hN_*`** – licznik cząstek danej kategorii zerujemy przed każdym zderzeniem i dopisujemy do histogramu na końcu pętli po cząstkach. Dzięki temu uwzględniamy też zdarzenia, w których dana cząstka nie pojawiła się ani razu (`N = 0`).
+- **Wiele kategorii naraz** – jedna cząstka może należeć do kilku grup jednocześnie (np. `π⁺` wpada do `all`, `ch` oraz `pip`), dlatego warunki sprawdzane są osobno, a nie przez `else if`.
+- **Zakres kąta φ** – Pythia zwraca φ w przedziale `(−π, π]`, a w zadaniu histogram ma zakres `[0, π]`. Zderzenia są symetryczne wokół wiązki, więc bierzemy wartość bezwzględną `|φ|` (funkcja `foldPhi`), dzięki czemu nie odrzucamy połowy danych z `φ < 0`.
+- **Zdarzenia powyżej `N = 400` (`overflow`)** – dla `hN_all` w ok. 10% zderzeń łączna liczba wszystkich cząstek przekracza 400 (dla samych naładowanych `hN_ch` to tylko kilkadziesiąt przypadków na 100k). Zakres `0–400` jest narzucony w zadaniu, więc go nie zmieniamy, a program tylko wypisuje na końcu informację o takich zdarzeniach.
 
 ### Etap 4 – wizualizacja (`draw_plots.C`)
 
@@ -153,18 +152,18 @@ Makro `draw_plots.C` otwiera `analysis.root` i dla każdej z 4 zmiennych (`N`, `
 
 Wykresy zapisywane są do katalogu `plots/` jako osobne pliki PNG (`dist_N.png`, `dist_pT.png`, `dist_eta.png`, `dist_phi.png`) oraz wspólny wielostronicowy PDF (`all_distributions.pdf`).
 
-Krótki opis otrzymanych rozkładów:
+Krótki opis otrzymanych wykresów:
 
-- **Krotność (`dist_N.png`)** – ponieważ zbieramy wszystkie cząstki końcowe w pełnym kącie bryłowym, całkowity ładunek w każdym zdarzeniu musi być równy ładunkowi dwóch początkowych protonów (`Q = +2`). Z zachowania ładunku wynika, że liczba cząstek naładowanych `N_ch` jest **zawsze parzysta** (`2, 4, 6, ...`), a nieparzyste biny są puste (dlatego na skali logarytmicznej linia spada co 2 biny do zera; w makrze rysujemy `hN_ch` cieńszą linią i nakładamy `hN_all` na wierzchu, żeby nie zasłonić czarnej krzywej). Wysoki pik dla `N_ch = 2` pochodzi ze zderzeń elastycznych `pp → pp`.
-- **Pęd poprzeczny (`dist_pT.png`)** – dla małych `p_T` widać gładki, wykładniczy spadek (procesy miękkie `SoftQCD`), który dla wyższych pędów przechodzi w ogon potęgowy. Widać też różnicę w produkcji zależną od masy: najwięcej jest najlżejszych pionów `π±`, mniej kaonów `K±`, a najmniej cięższych protonów i antyprotonów `p/p̄`.
-- **Pseudorapidity (`dist_eta.png`)** – rozkład jest symetryczny względem `η = 0`. Lekkie wcięcie („siodło”) w okolicy `η ≈ 0` bierze się z przeliczenia (jakobianu) między pospiesznością `y` a pseudorapidity `η` dla cząstek o niezerowej masie.
-- **Kąt azymutalny (`dist_phi.png`)** – rozkład w `[0, π]` jest płaski, bo zderzenia `pp` są symetryczne wokół osi wiązki. Na prawym panelu linia dla protonów `p` leży trochę wyżej niż dla antyprotonów `p̄` (i delikatnie `π⁺ > π⁻`, `K⁺ > K⁻`), co wynika z zachowania liczby barionowej (`B = +2`) i ładunku (`Q = +2`) ze stanu początkowego `pp`.
+- **Krotność (`dist_N.png`)** – ponieważ zderzamy dwa protony (łączny ładunek `+2`), z zasady zachowania ładunku liczba wszystkich wyprodukowanych cząstek naładowanych `N_ch` w zdarzeniu jest zawsze parzysta (`2, 4, 6, ...`), a nieparzyste biny mają wartość `0` (dlatego na wykresie logarytmicznym linia `ch` spada co 2 biny do zera). Wysoki pik dla `N_ch = 2` pochodzi ze zderzeń elastycznych, w których dwa protony po prostu odbijają się od siebie.
+- **Pęd poprzeczny (`dist_pT.png`)** – większość cząstek powstaje z małym pędem poprzecznym (poniżej 1–2 GeV), a dla wyższych pędów rozkład szybko opada. Widać też, że najwięcej produkuje się najlżejszych pionów `π±`, mniej kaonów `K±`, a najmniej cięższych protonów i antyprotonów.
+- **Pseudorapidity (`dist_eta.png`)** – rozkład jest symetryczny względem `η = 0`, bo zderzamy dwa takie same protony o równych energiach. Lekkie obniżenie na samym środku wokół `η = 0` to typowy kształt rozkładu pseudorapidity dla cząstek mających masę.
+- **Kąt azymutalny (`dist_phi.png`)** – rozkład jest płaski, bo żaden kierunek wokół osi wiązki nie jest wyróżniony. Na prawym panelu widać, że protonów `p` jest trochę więcej niż antyprotonów `p̄` (i minimalnie więcej `π⁺` niż `π⁻`), co wynika z dodatniego ładunku dwóch zderzanych protonów na wejściu.
 
 ## Skąd wielowątkowość i benchmark
 
 Na początku był tylko `generate_single_thread.cc` – najprostsza wersja, wzorowana na przykładach z Pythii. Przy pierwszych testach wyszło, że **wąskim gardłem jest sama generacja w Pythii**: jeden wątek daje ok. 1600 zdarzeń/s na M5, a na starszym laptopie dużo mniej, więc 100k zdarzeń to od ponad minuty do kilku minut. Każda poprawka w generatorze oznaczała kolejne czekanie. Sama analiza 100k zdarzeń trwa kilka sekund, więc tam nie było czego przyspieszać.
 
-Zderzenia są od siebie całkowicie niezależne, więc generacja to idealny kandydat do zrównoleglenia. Pythia od wersji 8.309 ma do tego gotową klasę `PythiaParallel` (dokumentacja „Parallelism” + przykłady `main221`–`main223`), więc nie trzeba było pisać własnych wątków:
+Zderzenia są od siebie całkowicie niezależne, więc generacja to idealny kandydat do zrównoleglenia. Pythia od wersji 8.309 ma do tego gotową klasę `PythiaParallel` (dokumentacja „Parallelism”), więc nie trzeba było pisać własnych wątków:
 
 - każdy wątek `k` ma własną instancję Pythii z seedem `12345 + k`,
 - `Parallelism:balanceLoad = on` daje każdemu wątkowi stałą liczbę zdarzeń, więc zbiór zdarzeń zależy tylko od seeda i liczby wątków,
@@ -198,8 +197,3 @@ Wersję jednowątkową zostawiliśmy celowo: działa też na starszych Pythiach 
 - Pełna komenda do odtworzenia jest zapisana w `production_info` w `events.root`.
 - Dołączony `analysis.root` powstał z `make run` (czyli `./generate 100000 10` na Apple M5) + `make analysis`.
 
-## Uwagi techniczne
-
-- `SoftQCD:all` (tak jak w treści zadania: „minimum bias (SoftQCD)”) obejmuje też zderzenia elastyczne i dyfrakcyjne. W elastycznych zostają tylko dwa protony lecące prawie wzdłuż wiązki (|η| ≫ 5), więc dają głównie wkład do `hN_*` przy małym N.
-- W `Makefile` jest `-std=c++17`, ale `root-config --cflags` dokleja standard, z którym zbudowano ROOT (np. `-std=c++20`) – kompilator bierze ostatnią flagę, co jest potrzebne dla zgodności z nagłówkami ROOT.
-- Przy kompilacji na macOS linker może wypisać ostrzeżenia `duplicate -rpath` – wynikają z tego, że `pythia8-config` i `root-config` dodają tę samą ścieżkę, są niegroźne.
